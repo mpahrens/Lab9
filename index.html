@@ -2,81 +2,40 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>Course Preferences Prototype</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Start Task</title>
   <link rel="stylesheet" href="styles.css" />
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    .start-wrap{min-height:100dvh; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2rem;}
+    .start-card{background:var(--panel); border:1px solid var(--outline); border-radius:18px; padding:1.6rem 1.4rem; max-width:520px; box-shadow:var(--shadow);}
+    .start-card h1{margin:.2rem 0 1rem; font-size:1.45rem;}
+    .start-card p{color:var(--muted); line-height:1.45;}
+    .actions{display:flex; gap:.75rem; justify-content:flex-end; margin-top:1.2rem}
+    .primary{font-size:1rem}
+  </style>
 </head>
 <body>
-  <header class="topbar" role="banner">
-    <button class="icon-btn" id="backBtn" aria-label="Go back" title="Back" disabled>⟵</button>
-    <button class="icon-btn" id="filterBtn" aria-haspopup="dialog" aria-controls="filterModal" title="Filter">⎇</button>
-    <button class="primary" id="saveBtn" aria-label="Save preferences" title="Save">Save ▸</button>
-  </header>
-
-  <main id="content" class="content" role="main">
-    <div id="courseList" class="course-list" aria-live="polite"></div>
-  </main>
-
-  <!-- Info Modal -->
-  <dialog id="infoModal" class="modal" aria-modal="true">
-    <div class="modal-card">
-      <div class="modal-header">
-        <h2 id="infoTitle">Course</h2>
-        <button class="icon-btn" data-close="infoModal" aria-label="Close">✕</button>
-      </div>
-      <div class="modal-body">
-        <p id="infoDescription"></p>
+  <div class="start-wrap">
+    <div class="start-card">
+      <h1>Course Preference Task</h1>
+      <p>You will select and rank courses using the prototype. Your interaction time and clicks will be recorded locally for usability metrics.</p>
+      <ul style="color:var(--muted); font-size:.9rem; line-height:1.4; padding-left:1.1rem;">
+        <li>Tap course selector to qualify and assign ranks (#1/#2/#3).</li>
+        <li>Toggle section buttons to include or exclude specific professors.</li>
+        <li>Use filters and info as needed; finish by pressing <strong>Save</strong>.</li>
+      </ul>
+      <div class="actions">
+        <button id="beginBtn" class="primary">Begin Task ▸</button>
       </div>
     </div>
-  </dialog>
-
-  <!-- Filter Modal -->
-  <dialog id="filterModal" class="modal" aria-modal="true">
-    <form method="dialog" class="modal-card" id="filterForm">
-      <div class="modal-header">
-        <h2>Filters</h2>
-        <button class="icon-btn" data-close="filterModal" aria-label="Close">✕</button>
-      </div>
-      <div class="modal-body">
-        <label class="switch">
-          <input type="checkbox" id="onlySelected" />
-          <span>Only show selected courses</span>
-        </label>
-        <label class="switch">
-          <input type="checkbox" id="showGrad" checked />
-          <span>Show grad courses</span>
-        </label>
-        <div class="range">
-          <div>
-            <label for="minCourse">Min course #</label>
-            <input id="minCourse" type="number" inputmode="numeric" value="1000" min="1000" max="5999" />
-          </div>
-          <span class="to">to</span>
-          <div>
-            <label for="maxCourse">Max course #</label>
-            <input id="maxCourse" type="number" inputmode="numeric" value="4999" min="1000" max="5999" />
-          </div>
-        </div>
-      </div>
-      <div class="modal-footer">
-        <button class="ghost" value="cancel">Cancel</button>
-        <button class="primary" value="apply" id="applyFilters">Apply</button>
-      </div>
-    </form>
-  </dialog>
-
-  <div id="toast" class="toast" role="status" aria-live="polite"></div>
-
-  <script src="app.js"></script>
+  </div>
   <script>
-    // ...existing code...
-    document.getElementById('beginTaskBtn').addEventListener('click', function() {
+    const RUN_KEY = 'currentRunMetrics';
+    document.getElementById('beginBtn').addEventListener('click', ()=>{
+      const fresh = { startedAt: Date.now(), nonInteractiveClicks:0, courseSelectorClicks:0, sectionSelectorClicks:0 };
+      localStorage.setItem(RUN_KEY, JSON.stringify(fresh));
       window.location.href = 'experiment.html';
     });
-    // ...existing code...
   </script>
 </body>
 </html>
