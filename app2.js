@@ -89,6 +89,7 @@ let touchDragCode = null;
 let touchStartY = 0, touchStartX = 0;
 let touchGhost = null;
 let touchDragStarted = false; // becomes true once movement threshold passed
+let suppressNextChipClick = false; // prevent duplicate click after touchend toggle
 
 function init(){
   renderCourses();
@@ -295,6 +296,8 @@ function handleCardDragStart(e){
   card.classList.add('dragging');
   e.dataTransfer.effectAllowed = 'copy';
   e.dataTransfer.setData('text/plain', code);
+  // Activate global drag visuals (empty slot pulsing)
+  document.body.classList.add('drag-active');
 }
 
 function handleChipDragStart(e){
@@ -306,6 +309,8 @@ function handleChipDragStart(e){
   chip.classList.add('dragging');
   e.dataTransfer.effectAllowed = 'move';
   e.dataTransfer.setData('text/plain', code);
+  // Activate global drag visuals (empty slot pulsing)
+  document.body.classList.add('drag-active');
 }
 
 function handleDragEnd(e){
@@ -313,6 +318,12 @@ function handleDragEnd(e){
   draggedChip = null;
   dragSourceType = null;
   dragSourceCode = null;
+  // Cleanup drag state visuals
+  document.body.classList.remove('drag-active');
+  const prefsArea = document.querySelector('.preferences-area');
+  const selectedArea = document.querySelector('.selected-area');
+  if(prefsArea) prefsArea.classList.remove('drag-over');
+  if(selectedArea) selectedArea.classList.remove('drag-over');
 }
 
 function handleSectionDragStart(e){
@@ -367,6 +378,11 @@ function createChip(code){
     e.stopPropagation();
     // Clean up any ghost
     if(touchGhost){ try{ document.body.removeChild(touchGhost);}catch(_){} touchGhost=null; }
+    if(suppressNextChipClick){
+      // Skip duplicate click following a touchend toggle
+      suppressNextChipClick = false;
+      return;
+    }
     toggleCourseSelection(code);
   });
   return chip;
@@ -435,12 +451,39 @@ function handleTouchDragMove(e){
   if(!touchDragStarted && (dx > 8 || dy > 8)){
     touchDragStarted = true;
     createTouchGhost(touchDragEl, touch);
+    document.body.classList.add('drag-active');
     e.preventDefault();
   }
   if(touchDragStarted && touchGhost){
     e.preventDefault();
     touchGhost.style.left = (touch.clientX - 40) + 'px';
     touchGhost.style.top = (touch.clientY - 20) + 'px';
+    const elUnder = document.elementFromPoint(touch.clientX, touch.clientY);
+    
+    // Highlight preferences area
+    const prefsArea = document.querySelector('.preferences-area');
+    if(elUnder && (elUnder.classList.contains('preferences-area') || elUnder.closest('.preferences-area'))){
+      prefsArea.classList.add('drag-over');
+    } else {
+      prefsArea.classList.remove('drag-over');
+    }
+    
+    // Highlight selected area
+    const selectedArea = document.querySelector('.selected-area');
+    if(elUnder && (elUnder.classList.contains('selected-area') || elUnder.closest('.selected-area'))){
+      selectedArea.classList.add('drag-over');
+    } else if(selectedArea){
+      selectedArea.classList.remove('drag-over');
+    }
+    
+    // Highlight individual preference slots
+    [pref1El, pref2El, pref3El].forEach(slot => {
+      if(elUnder && (elUnder === slot || elUnder.parentElement === slot)){
+        slot.classList.add('drag-over');
+      } else {
+        slot.classList.remove('drag-over');
+      }
+    });
   }
 }
 
@@ -452,7 +495,11 @@ function handleTouchDragEnd(e){
   }
   // If drag never started treat as tap (chips only toggle)
   if(!touchDragStarted && touchDragType === 'chip' && touchDragCode){
+    // Treat as tap, toggle once and suppress synthetic click
     toggleCourseSelection(touchDragCode);
+    suppressNextChipClick = true;
+    // Prevent default to stop the follow-up synthetic click event
+    if(e.cancelable) e.preventDefault();
   } else if(touchDragStarted){
     const touch = e.changedTouches[0];
     const dropTarget = document.elementFromPoint(touch.clientX, touch.clientY);
@@ -478,6 +525,13 @@ function handleTouchDragEnd(e){
   touchDragType = null;
   touchDragCode = null;
   touchDragStarted = false;
+  const prefsArea = document.querySelector('.preferences-area');
+  if(prefsArea) prefsArea.classList.remove('drag-over');
+  const selectedArea = document.querySelector('.selected-area');
+  if(selectedArea) selectedArea.classList.remove('drag-over');
+  // Clear drag-over from all individual slots
+  [pref1El, pref2El, pref3El].forEach(slot => slot.classList.remove('drag-over'));
+  document.body.classList.remove('drag-active');
   document.removeEventListener('touchmove', handleTouchDragMove);
   document.removeEventListener('touchend', handleTouchDragEnd);
 }
@@ -594,14 +648,17 @@ function handleDropCourseListTouch(){
 }
 
 function wireBinDropZones(){
-  // Make bin (selected courses area) a drop zone
-  selectedCoursesEl.addEventListener('dragover', handleDragOver);
-  selectedCoursesEl.addEventListener('drop', (e)=> handleDropSelected(e));
+  // Make selected courses area a drop zone with highlight
+  const selectedArea = document.querySelector('.selected-area');
+  selectedCoursesEl.addEventListener('dragover', (e)=> { handleDragOver(e); selectedArea.classList.add('drag-over'); });
+  selectedCoursesEl.addEventListener('dragleave', ()=> { selectedArea.classList.remove('drag-over'); });
+  selectedCoursesEl.addEventListener('drop', (e)=> { handleDropSelected(e); selectedArea.classList.remove('drag-over'); });
   
   // Make entire preferences area a single drop zone
   const prefsArea = document.querySelector('.preferences-area');
-  prefsArea.addEventListener('dragover', handleDragOver);
-  prefsArea.addEventListener('drop', (e)=> handleDropPreferences(e));
+  prefsArea.addEventListener('dragover', (e)=> { handleDragOver(e); prefsArea.classList.add('drag-over'); });
+  prefsArea.addEventListener('dragleave', ()=> { prefsArea.classList.remove('drag-over'); });
+  prefsArea.addEventListener('drop', (e)=> { handleDropPreferences(e); prefsArea.classList.remove('drag-over'); });
   
   // Make individual preference slots drop zones for swapping
   [pref1El, pref2El, pref3El].forEach((el, idx)=>{

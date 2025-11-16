@@ -63,6 +63,15 @@
       min-width: 200px;
       flex-shrink: 0;
     }
+    .preferences-area.drag-over {
+      background: rgba(74,222,128,.15);
+      border-color: var(--accent);
+    }
+    /* Selected area drag-over highlight */
+    .selected-area.drag-over {
+      background: rgba(74,222,128,.12);
+      border-color: var(--accent);
+    }
     .preferences-area:hover {
       background: rgba(74,222,128,.05);
       border-color: var(--accent);
@@ -148,6 +157,15 @@
       background: rgba(74,222,128,.15);
       border-color: var(--accent);
       transform: scale(1.05);
+    }
+    /* Pulse animation for empty slots while dragging */
+    @keyframes slotPulse {
+      0% { box-shadow: 0 0 0 0 rgba(74,222,128,.55); }
+      70% { box-shadow: 0 0 0 10px rgba(74,222,128,0); }
+      100% { box-shadow: 0 0 0 0 rgba(74,222,128,0); }
+    }
+    body.drag-active .pref-slot.drag-over:empty {
+      animation: slotPulse 1.2s ease-in-out infinite;
     }
     /* Adjust content to account for bin */
     .content {
