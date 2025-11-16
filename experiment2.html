@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Course Preferences Prototype</title>
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    /* Selection bin at bottom */
+    .selection-bin {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: var(--panel);
+      border-top: 2px solid var(--outline);
+      box-shadow: 0 -4px 20px rgba(0,0,0,.4);
+      z-index: 100;
+      max-height: 40vh;
+      overflow-y: auto;
+    }
+    .bin-header {
+      padding: .75rem 1rem;
+      border-bottom: 1px solid var(--outline);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+    }
+    .bin-header h3 {
+      margin: 0;
+      font-size: 1.1rem;
+      font-weight: 700;
+        flex: 1;
+        text-align: center;
+      }
+      .bin-header-left {
+        min-width: 100px;
+      }
+      .bin-header-right {
+        min-width: 100px;
+        display: flex;
+        justify-content: flex-end;
+    }
+    .bin-body {
+      padding: 1rem;
+      display: flex;
+      gap: 1rem;
+      align-items: stretch;
+    }
+    .preferences-area {
+      background: rgba(255,255,255,.03);
+      border: 2px dashed var(--accent);
+      border-radius: 12px;
+      padding: .75rem;
+      display: flex;
+      flex-direction: column;
+      gap: .5rem;
+      transition: background .2s ease, border-color .2s ease;
+      min-width: 200px;
+      flex-shrink: 0;
+    }
+    .preferences-area:hover {
+      background: rgba(74,222,128,.05);
+      border-color: var(--accent);
+    }
+    .preferences-area::before {
+      content: 'Top Preferences';
+      font-size: .85rem;
+      font-weight: 700;
+      color: var(--muted);
+      text-align: center;
+      padding-bottom: .5rem;
+      border-bottom: 1px solid rgba(255,255,255,.1);
+    }
+    .selected-area {
+      flex: 1;
+      min-height: 120px;
+      background: rgba(255,255,255,.02);
+      border: 2px dashed var(--outline);
+      border-radius: 12px;
+      padding: .75rem;
+      display: flex;
+      flex-direction: column;
+    }
+    .course-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: .5rem;
+      flex: 1;
+    }
+    .course-chip {
+      background: var(--primary);
+      color: white;
+      padding: .5rem .9rem;
+      border-radius: 8px;
+      font-weight: 700;
+      font-size: .9rem;
+      cursor: grab;
+      user-select: none;
+      transition: transform .15s ease, opacity .15s ease;
+      height: fit-content;
+    }
+    .course-chip:hover {
+      transform: translateY(-2px);
+      filter: brightness(1.1);
+    }
+    .course-chip.dragging {
+      opacity: .5;
+      cursor: grabbing;
+    }
+    .pref-slot-container {
+      display: flex;
+      align-items: center;
+      gap: .5rem;
+    }
+    .pref-slot-container label {
+      font-size: .75rem;
+      font-weight: 700;
+      color: var(--muted);
+      min-width: 30px;
+    }
+    .pref-slot {
+      flex: 1;
+      min-height: 50px;
+      background: rgba(0,0,0,.2);
+      border: 1px solid rgba(255,255,255,.1);
+      border-radius: 8px;
+      padding: .4rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background .15s ease, border-color .15s ease, transform .15s ease;
+    }
+    .pref-slot:empty::after {
+      content: '—';
+      color: var(--muted);
+      font-size: .75rem;
+      opacity: .5;
+    }
+    .pref-slot.drag-over {
+      background: rgba(74,222,128,.15);
+      border-color: var(--accent);
+      transform: scale(1.05);
+    }
+    /* Adjust content to account for bin */
+    .content {
+      padding-bottom: calc(40vh + 1rem);
+    }
+    /* Dragging feedback */
+    .card.dragging {
+      opacity: .6;
+      cursor: grabbing;
+    }
+    .card[draggable="true"] {
+      cursor: grab;
+    }
+    .card[draggable="true"]:active {
+      cursor: grabbing;
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar" role="banner">
+    <!-- Buttons moved to bin header -->
+  </header>
+
+  <main id="content" class="content" role="main">
+    <div id="courseList" class="course-list" aria-live="polite"></div>
+  </main>
+
+  <!-- Info Modal -->
+  <dialog id="infoModal" class="modal" aria-modal="true">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2 id="infoTitle">Course</h2>
+        <button class="icon-btn" data-close="infoModal" aria-label="Close">✕</button>
+      </div>
+      <div class="modal-body">
+        <p id="infoDescription"></p>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- Filter Modal -->
+  <dialog id="filterModal" class="modal" aria-modal="true">
+    <form method="dialog" class="modal-card" id="filterForm">
+      <div class="modal-header">
+        <h2>Filters</h2>
+        <button class="icon-btn" data-close="filterModal" aria-label="Close">✕</button>
+      </div>
+      <div class="modal-body">
+        <label class="switch">
+          <input type="checkbox" id="onlySelected" />
+          <span>Only show selected courses</span>
+        </label>
+        <label class="switch">
+          <input type="checkbox" id="showGrad" checked />
+          <span>Show grad courses</span>
+        </label>
+        <div class="range">
+          <div>
+            <label for="minCourse">Min course #</label>
+            <input id="minCourse" type="number" inputmode="numeric" value="1000" min="1000" max="5999" />
+          </div>
+          <span class="to">to</span>
+          <div>
+            <label for="maxCourse">Max course #</label>
+            <input id="maxCourse" type="number" inputmode="numeric" value="4999" min="1000" max="5999" />
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="ghost" value="cancel">Cancel</button>
+        <button class="primary" value="apply" id="applyFilters">Apply</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Selection Bin -->
+  <div id="bin" class="selection-bin">
+    <div class="bin-header">
+        <div class="bin-header-left">
+          <button class="icon-btn" id="backBtn" aria-label="Go back" title="Back" disabled>⟵</button>
+        </div>
+        <h3>Selected Courses</h3>
+        <div class="bin-header-right">
+          <button class="primary" id="saveBtn" aria-label="Save preferences" title="Save">Save ▸</button>
+        </div>
+    </div>
+    <div class="bin-body">
+      <div class="preferences-area">
+        <div class="pref-slot-container">
+          <label>1st</label>
+          <div id="pref1" class="pref-slot" data-rank="1"></div>
+        </div>
+        <div class="pref-slot-container">
+          <label>2nd</label>
+          <div id="pref2" class="pref-slot" data-rank="2"></div>
+        </div>
+        <div class="pref-slot-container">
+          <label>3rd</label>
+          <div id="pref3" class="pref-slot" data-rank="3"></div>
+        </div>
+      </div>
+      <div class="selected-area">
+        <div id="selectedCourses" class="course-chips"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <script src="app2.js"></script>
+</body>
+</html>

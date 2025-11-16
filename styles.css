@@ -54,10 +54,13 @@ body{
   background:var(--card); border:1px solid var(--outline); border-radius:var(--radius);
   box-shadow:var(--shadow); padding:.9rem; position:relative;
 }
-.card-header{display:flex; align-items:center; justify-content:space-between; gap:.75rem}
+.card-header{display:flex; align-items:center; justify-content:space-between; gap:.75rem; cursor:pointer; border-radius:10px; transition:background .15s ease}
+.card-header:hover{ background:rgba(255,255,255,.03) }
 .title{
   display:flex; align-items:center; gap:.5rem; font-weight:700; font-size:1.05rem;
+  cursor:pointer; user-select:none;
 }
+.card-header:hover .course-code{ text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 3px; }
 .info-btn{width:1.6rem; height:1.6rem; border-radius:999px; display:grid; place-items:center; font-weight:900;
   background:#111318; color:#a7ffb6; border:1px solid var(--outline); cursor:pointer}
 .info-btn:hover{filter:brightness(1.1)}
@@ -90,7 +93,8 @@ body{
 @keyframes tapHint{0%{opacity:0; transform:scale(.6)} 30%{opacity:1; transform:scale(1)} 100%{opacity:0; transform:scale(1.2)}}
 
 .section-list{margin-top:.65rem; display:flex; flex-direction:column; gap:.5rem}
-.section{display:flex; align-items:center; justify-content:space-between; gap:.5rem; padding:.55rem .6rem; border:1px dashed var(--outline); border-radius:10px}
+.section{display:flex; align-items:center; justify-content:space-between; gap:.5rem; padding:.55rem .6rem; border:1px dashed var(--outline); border-radius:10px; cursor:pointer; transition:background .15s ease, border-color .15s ease}
+.section:hover{ background:rgba(255,255,255,.03); border-color:#2f2f39 }
 .section .meta{color:var(--muted); font-size:.92rem}
 .section .sec-btn{
   --size:32px; min-width:var(--size); min-height:var(--size); display:grid; place-items:center;

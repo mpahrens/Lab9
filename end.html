@@ -66,7 +66,7 @@
   document.getElementById('restartBtn').addEventListener('click', ()=>{
     const fresh = { startedAt: Date.now(), nonInteractiveClicks:0, courseSelectorClicks:0, sectionSelectorClicks:0 };
     lsSet(RUN_KEY, JSON.stringify(fresh));
-    window.location.href='start.html';
+    window.location.href='index.html';
   });
   document.getElementById('clearBtn').addEventListener('click', ()=>{
     if(confirm('Clear all stored run metrics?')){ try{ localStorage.removeItem(ALL_KEY);}catch(e){} load(); }

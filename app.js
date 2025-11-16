@@ -256,7 +256,9 @@ function triggerPulse(){
 
 function bindDynamicEvents(){
   document.querySelectorAll('[data-info]').forEach(btn=>{
-    btn.addEventListener('click', ()=>{
+    btn.addEventListener('click', (e)=>{
+      // Prevent bubbling so title's multi-tap doesn't trigger when tapping info
+      e.stopPropagation();
       const code = btn.getAttribute('data-info');
       const course = courses.find(c=>c.code===code);
       document.getElementById('infoTitle').textContent = `${course.code} - ${course.name}`;
@@ -266,9 +268,36 @@ function bindDynamicEvents(){
   });
   document.querySelectorAll('[data-select]').forEach(btn=>{
     attachTap(btn, (count)=>{ metricsCountCourseTap(); previewCourseTap(btn, count); }, (e, count)=> commitCourseMulti(btn, count));
+    // Ensure clicks on selector don't bubble to header tap handler
+    btn.addEventListener('click', (e)=> e.stopPropagation());
+  });
+  // Make entire header row clickable with same multi-tap behavior as selector
+  document.querySelectorAll('.card .card-header').forEach(headerEl=>{
+    const card = headerEl.closest('.card');
+    const selBtn = card && card.querySelector('[data-select]');
+    if(!selBtn) return;
+    attachTap(
+      headerEl,
+      // onProgress: mirror preview on the actual selector button and count metrics
+      (count)=>{ metricsCountCourseTap(); previewCourseTap(selBtn, count); },
+      // onCommit: forward the committed gesture to the selector
+      (e, count)=>{ commitCourseMulti(selBtn, count); }
+    );
   });
   document.querySelectorAll('[data-sec-btn]').forEach(btn=>{
     btn.addEventListener('click', ()=> { metricsCountSectionTap(); addTapFeedback(btn); handleSectionClick(btn); });
+  });
+  // Allow clicking anywhere on the section row to toggle its checkbox
+  document.querySelectorAll('.section').forEach(row=>{
+    row.addEventListener('click', (e)=>{
+      // If the click was directly on the button, its own handler will run
+      if(e.target.closest('.sec-btn')) return;
+      const btn = row.querySelector('.sec-btn');
+      if(!btn) return;
+      metricsCountSectionTap();
+      addTapFeedback(btn);
+      handleSectionClick(btn);
+    });
   });
   // run any pending pulses after elements exist
   triggerPulse();
