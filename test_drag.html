@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+.slot { width: 100px; height: 50px; border: 2px solid blue; margin: 10px; }
+.slot.drag-over { background: lightgreen; }
+.item { width: 100px; height: 30px; background: red; color: white; margin: 5px; cursor: move; }
+</style>
+</head>
+<body>
+<div class="item" draggable="true" id="item1">Drag me</div>
+<div class="slot" id="slot1">Slot 1</div>
+<script>
+let dragData = null;
+document.getElementById('item1').addEventListener('dragstart', (e) => {
+  dragData = 'test-data';
+  e.dataTransfer.setData('text/plain', 'test-data');
+  console.log('dragstart');
+});
+document.getElementById('slot1').addEventListener('dragover', (e) => {
+  e.preventDefault();
+  e.currentTarget.classList.add('drag-over');
+  console.log('dragover');
+});
+document.getElementById('slot1').addEventListener('drop', (e) => {
+  e.preventDefault();
+  console.log('DROP!', e.dataTransfer.getData('text/plain'), dragData);
+  e.currentTarget.textContent = 'DROPPED!';
+  e.currentTarget.classList.remove('drag-over');
+});
+</script>
+</body>
+</html>

@@ -137,6 +137,8 @@ function renderCourses(){
     card.className='card';
     card.draggable = true;
     card.dataset.code = course.code;
+    // Hover text to hint drag action into bins
+    card.title = `You can drag ${getShortCode(course.code)} into the bins below`;
     
     const selClasses = ['selector'];
     let selContent = '<span class="plus">+</span>';
@@ -172,8 +174,8 @@ function renderSection(code, sec){
     cls = ''; content = '+';
   } else if(st==='exclude') { cls='exclude'; content='✕'; }
   else { cls='prefer'; content='✔'; }
-  
-  return `<div class="section" data-course="${code}" data-sec="${sec.id}">
+  const shortCode = getShortCode(code);
+  return `<div class="section" data-course="${code}" data-sec="${sec.id}" title="You can drag ${shortCode} into the bins below">
     <div class="meta">${sec.id} - ${sec.professor}</div>
     <button class="sec-btn ${cls}" data-sec-btn="${code}:${sec.id}">${content}</button>
   </div>`;
@@ -220,7 +222,7 @@ function bindDynamicEvents(){
     });
   });
   
-  // Section row click
+  // Section row click and drag
   document.querySelectorAll('.section').forEach(row=>{
     row.addEventListener('click', (e)=>{
       if(e.target.closest('.sec-btn')) return;
@@ -229,6 +231,10 @@ function bindDynamicEvents(){
       metricsCountSectionTap();
       handleSectionClick(btn);
     });
+    // Enable dragging directly from a section row into bins
+    row.setAttribute('draggable','true');
+    row.addEventListener('dragstart', handleSectionDragStart);
+    row.addEventListener('dragend', handleDragEnd);
   });
   
   // Drag events for cards
@@ -245,6 +251,8 @@ function toggleCourseSelection(code){
     for(let rank in state.preferences){
       if(state.preferences[rank] === code) state.preferences[rank] = null;
     }
+    // Shift remaining preferences up when a slot is cleared
+    compactPreferences();
   } else {
     // Select: add to selected set, initialize section prefs
     state.selected.add(code);
@@ -269,6 +277,7 @@ function handleCardDragStart(e){
   const card = e.currentTarget;
   const code = card.dataset.code;
   dragSourceType = 'card';
+  console.log("CARD DRAG START", code);
   dragSourceCode = code;
   card.classList.add('dragging');
   e.dataTransfer.effectAllowed = 'copy';
@@ -291,6 +300,19 @@ function handleDragEnd(e){
   draggedChip = null;
   dragSourceType = null;
   dragSourceCode = null;
+}
+
+function handleSectionDragStart(e){
+  // Prevent drag if starting on the section's toggle button
+  if(e.target && e.target.closest('.sec-btn')){ e.preventDefault(); return; }
+  console.log("SECTION DRAG START", code);
+  const row = e.currentTarget;
+  const code = row.getAttribute('data-course');
+  dragSourceType = 'card'; // treat section drags like card drags (copy semantics)
+  dragSourceCode = code;
+  row.classList.add('dragging');
+  e.dataTransfer.effectAllowed = 'copy';
+  e.dataTransfer.setData('text/plain', code);
 }
 
 function renderBin(){
@@ -348,17 +370,22 @@ function wireBinDropZones(){
     el.addEventListener('dragover', (e)=>{
       e.preventDefault();
       e.stopPropagation(); // Prevent parent preferences area from handling
-      e.dataTransfer.dropEffect = 'move';
+      console.log("DRAGOVER SLOT", rank);
+      e.dataTransfer.dropEffect = dragSourceType === 'card' ? 'copy' : 'move';
       el.classList.add('drag-over');
     });
     el.addEventListener('dragleave', (e)=>{
+      console.log("DRAGLEAVE SLOT", rank);
       el.classList.remove('drag-over');
     });
     el.addEventListener('drop', (e)=> {
+      e.preventDefault();
+      console.log("DROP ON SLOT", rank, "source:", dragSourceType, "code:", dragSourceCode);
       e.stopPropagation(); // Prevent parent preferences area from handling
       el.classList.remove('drag-over');
       handleDropOnSlot(e, rank);
     });
+    console.log("Wired slot", rank, el.id, "for drop");
   });
   
   // Make course list a drop zone (to remove from bin)
@@ -373,7 +400,8 @@ function handleDragOver(e){
 
 function handleDropSelected(e){
   e.preventDefault();
-  const code = e.dataTransfer.getData('text/plain');
+  let code = e.dataTransfer.getData('text/plain');
+  if(!code && dragSourceCode) code = dragSourceCode;
   if(!code) return;
   
   if(dragSourceType === 'card'){
@@ -400,7 +428,8 @@ function handleDropSelected(e){
 
 function handleDropPref(e, rank){
   e.preventDefault();
-  const code = e.dataTransfer.getData('text/plain');
+  let code = e.dataTransfer.getData('text/plain');
+  if(!code && dragSourceCode) code = dragSourceCode;
   if(!code) return;
   
   // Ensure course is selected
@@ -426,7 +455,9 @@ function handleDropPref(e, rank){
 
 function handleDropPreferences(e){
   e.preventDefault();
-  const code = e.dataTransfer.getData('text/plain');
+  console.log("DROP ON PREFS AREA", "source:", dragSourceType, "code:", dragSourceCode);
+  let code = e.dataTransfer.getData('text/plain');
+  if(!code && dragSourceCode) code = dragSourceCode;
   if(!code) return;
   
   // Ensure course is selected
@@ -462,7 +493,8 @@ function handleDropPreferences(e){
 
 function handleDropCourseList(e){
   e.preventDefault();
-  const code = e.dataTransfer.getData('text/plain');
+  let code = e.dataTransfer.getData('text/plain');
+  if(!code && dragSourceCode) code = dragSourceCode;
   if(!code) return;
   
   // Only handle chips dragged out of bin
@@ -492,7 +524,8 @@ function compactPreferences(){
 // Handle drop on a specific preference slot (for swapping)
 function handleDropOnSlot(e, targetRank){
   e.preventDefault();
-  const draggedCode = e.dataTransfer.getData('text/plain');
+  let draggedCode = e.dataTransfer.getData('text/plain');
+  if(!draggedCode && dragSourceCode) draggedCode = dragSourceCode;
   if(!draggedCode) return;
   
   // Ensure course is selected

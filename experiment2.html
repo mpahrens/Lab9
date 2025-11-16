@@ -116,12 +116,14 @@
       display: flex;
       align-items: center;
       gap: .5rem;
+      pointer-events: none;
     }
     .pref-slot-container label {
       font-size: .75rem;
       font-weight: 700;
       color: var(--muted);
       min-width: 30px;
+      pointer-events: none;
     }
     .pref-slot {
       flex: 1;
@@ -133,6 +135,7 @@
       display: flex;
       align-items: center;
       justify-content: center;
+      pointer-events: auto;
       transition: background .15s ease, border-color .15s ease, transform .15s ease;
     }
     .pref-slot:empty::after {
