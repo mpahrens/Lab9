@@ -88,6 +88,7 @@ let touchDragType = null;
 let touchDragCode = null;
 let touchStartY = 0, touchStartX = 0;
 let touchGhost = null;
+let touchDragStarted = false; // becomes true once movement threshold passed
 
 function init(){
   renderCourses();
@@ -231,7 +232,7 @@ function bindDynamicEvents(){
     });
   });
 
-  // Section row click and drag
+  // Section row click (no drag)
   document.querySelectorAll('.section').forEach(row=>{
     row.addEventListener('click', (e)=>{
       if(e.target.closest('.sec-btn')) return;
@@ -240,12 +241,11 @@ function bindDynamicEvents(){
       metricsCountSectionTap();
       handleSectionClick(btn);
     });
-    // Enable dragging directly from a section row into bins
-    row.setAttribute('draggable','true');
-    row.addEventListener('dragstart', handleSectionDragStart);
-    row.addEventListener('dragend', handleDragEnd);
-    // Touch events for mobile drag
-    row.addEventListener('touchstart', handleTouchDragStartSection, {passive:false});
+    // Remove draggable and drag events from section rows
+    row.removeAttribute('draggable');
+    row.removeEventListener('dragstart', handleSectionDragStart);
+    row.removeEventListener('dragend', handleDragEnd);
+    row.removeEventListener('touchstart', handleTouchDragStartSection, {passive:false});
   });
 
   // Drag events for cards
@@ -365,13 +365,16 @@ function createChip(code){
   // Allow clicking chip to unselect (but prevent default drag behavior on click)
   chip.addEventListener('click', (e)=>{
     e.stopPropagation();
+    // Clean up any ghost
+    if(touchGhost){ try{ document.body.removeChild(touchGhost);}catch(_){} touchGhost=null; }
     toggleCourseSelection(code);
   });
   return chip;
 }
 // --- Touch Drag and Drop for Mobile ---
 function handleTouchDragStartCard(e){
-  e.preventDefault();
+  // Ignore taps on selector button (normal click logic handles it)
+  if(e.target.closest('.selector')) return;
   const card = e.currentTarget;
   const code = card.dataset.code;
   touchDragEl = card;
@@ -379,13 +382,12 @@ function handleTouchDragStartCard(e){
   touchDragCode = code;
   touchStartY = e.touches[0].clientY;
   touchStartX = e.touches[0].clientX;
-  createTouchGhost(card, e.touches[0]);
+  touchDragStarted = false;
   document.addEventListener('touchmove', handleTouchDragMove, {passive:false});
   document.addEventListener('touchend', handleTouchDragEnd, {passive:false});
 }
 
 function handleTouchDragStartChip(e){
-  e.preventDefault();
   const chip = e.currentTarget;
   const code = chip.dataset.code;
   touchDragEl = chip;
@@ -393,7 +395,7 @@ function handleTouchDragStartChip(e){
   touchDragCode = code;
   touchStartY = e.touches[0].clientY;
   touchStartX = e.touches[0].clientX;
-  createTouchGhost(chip, e.touches[0]);
+  touchDragStarted = false;
   document.addEventListener('touchmove', handleTouchDragMove, {passive:false});
   document.addEventListener('touchend', handleTouchDragEnd, {passive:false});
 }
@@ -426,42 +428,56 @@ function createTouchGhost(el, touch){
 }
 
 function handleTouchDragMove(e){
-  e.preventDefault();
-  if(!touchGhost) return;
+  if(!touchDragEl) return;
   const touch = e.touches[0];
-  touchGhost.style.left = (touch.clientX - 40) + 'px';
-  touchGhost.style.top = (touch.clientY - 20) + 'px';
+  const dy = Math.abs(touch.clientY - touchStartY);
+  const dx = Math.abs(touch.clientX - touchStartX);
+  if(!touchDragStarted && (dx > 8 || dy > 8)){
+    touchDragStarted = true;
+    createTouchGhost(touchDragEl, touch);
+    e.preventDefault();
+  }
+  if(touchDragStarted && touchGhost){
+    e.preventDefault();
+    touchGhost.style.left = (touch.clientX - 40) + 'px';
+    touchGhost.style.top = (touch.clientY - 20) + 'px';
+  }
 }
 
 function handleTouchDragEnd(e){
-  if(touchGhost){
-    document.body.removeChild(touchGhost);
-    touchGhost = null;
+  if(!touchDragEl){
+    document.removeEventListener('touchmove', handleTouchDragMove);
+    document.removeEventListener('touchend', handleTouchDragEnd);
+    return;
   }
-  // Find drop target under finger
-  const touch = e.changedTouches[0];
-  const dropTarget = document.elementFromPoint(touch.clientX, touch.clientY);
-  // Preference slots
-  if(dropTarget){
-    if(dropTarget.classList.contains('course-chip')){
-      // Dropped on a chip: treat as swap in preferences
-      const parentSlot = dropTarget.parentElement;
-      const slotRank = getSlotRank(parentSlot);
-      if(slotRank) handleDropOnSlotTouch(slotRank);
-    } else if(dropTarget.id === 'pref1' || dropTarget.id === 'pref2' || dropTarget.id === 'pref3'){
-      const slotRank = getSlotRank(dropTarget);
-      if(slotRank) handleDropOnSlotTouch(slotRank);
-    } else if(dropTarget.id === 'selectedCourses'){
-      handleDropSelectedTouch();
-    } else if(dropTarget.classList.contains('preferences-area')){
-      handleDropPreferencesTouch();
-    } else if(dropTarget.id === 'courseList'){
-      handleDropCourseListTouch();
+  // If drag never started treat as tap (chips only toggle)
+  if(!touchDragStarted && touchDragType === 'chip' && touchDragCode){
+    toggleCourseSelection(touchDragCode);
+  } else if(touchDragStarted){
+    const touch = e.changedTouches[0];
+    const dropTarget = document.elementFromPoint(touch.clientX, touch.clientY);
+    if(dropTarget){
+      if(dropTarget.classList.contains('course-chip')){
+        const parentSlot = dropTarget.parentElement;
+        const slotRank = getSlotRank(parentSlot);
+        if(slotRank) handleDropOnSlotTouch(slotRank);
+      } else if(['pref1','pref2','pref3'].includes(dropTarget.id)){
+        const slotRank = getSlotRank(dropTarget);
+        if(slotRank) handleDropOnSlotTouch(slotRank);
+      } else if(dropTarget.id === 'selectedCourses'){
+        handleDropSelectedTouch();
+      } else if(dropTarget.classList.contains('preferences-area')){
+        handleDropPreferencesTouch();
+      } else if(dropTarget.id === 'courseList'){
+        handleDropCourseListTouch();
+      }
     }
   }
+  if(touchGhost){ try{ document.body.removeChild(touchGhost);}catch(_){} touchGhost=null; }
   touchDragEl = null;
   touchDragType = null;
   touchDragCode = null;
+  touchDragStarted = false;
   document.removeEventListener('touchmove', handleTouchDragMove);
   document.removeEventListener('touchend', handleTouchDragEnd);
 }
