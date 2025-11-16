@@ -507,11 +507,16 @@ function handleTouchDragEnd(e){
       if(dropTarget.classList.contains('course-chip')){
         const parentSlot = dropTarget.parentElement;
         const slotRank = getSlotRank(parentSlot);
-        if(slotRank) handleDropOnSlotTouch(slotRank);
+        if(slotRank) {
+          handleDropOnSlotTouch(slotRank);
+        } else if(parentSlot.id === 'selectedCourses' || parentSlot.closest('.selected-area')){
+          // Dropped on a chip in selected courses area
+          handleDropSelectedTouch();
+        }
       } else if(['pref1','pref2','pref3'].includes(dropTarget.id)){
         const slotRank = getSlotRank(dropTarget);
         if(slotRank) handleDropOnSlotTouch(slotRank);
-      } else if(dropTarget.id === 'selectedCourses'){
+      } else if(dropTarget.id === 'selectedCourses' || dropTarget.closest('.selected-area')){
         handleDropSelectedTouch();
       } else if(dropTarget.classList.contains('preferences-area')){
         handleDropPreferencesTouch();
