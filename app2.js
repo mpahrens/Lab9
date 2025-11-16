@@ -77,9 +77,17 @@ const pref1El = document.getElementById('pref1');
 const pref2El = document.getElementById('pref2');
 const pref3El = document.getElementById('pref3');
 
+
 let draggedChip = null;
 let dragSourceType = null; // 'card' or 'chip'
 let dragSourceCode = null;
+
+// Touch drag state
+let touchDragEl = null;
+let touchDragType = null;
+let touchDragCode = null;
+let touchStartY = 0, touchStartX = 0;
+let touchGhost = null;
 
 function init(){
   renderCourses();
@@ -181,6 +189,7 @@ function renderSection(code, sec){
   </div>`;
 }
 
+
 function bindDynamicEvents(){
   // Info buttons
   document.querySelectorAll('[data-info]').forEach(btn=>{
@@ -193,7 +202,7 @@ function bindDynamicEvents(){
       openModal('infoModal');
     });
   });
-  
+
   // Selector buttons - simple toggle
   document.querySelectorAll('[data-select]').forEach(btn=>{
     btn.addEventListener('click', (e)=>{
@@ -203,7 +212,7 @@ function bindDynamicEvents(){
       metricsCountCourseTap();
     });
   });
-  
+
   // Card header click to toggle
   document.querySelectorAll('.card .card-header').forEach(headerEl=>{
     headerEl.addEventListener('click', (e)=>{
@@ -213,7 +222,7 @@ function bindDynamicEvents(){
       metricsCountCourseTap();
     });
   });
-  
+
   // Section buttons
   document.querySelectorAll('[data-sec-btn]').forEach(btn=>{
     btn.addEventListener('click', ()=> { 
@@ -221,7 +230,7 @@ function bindDynamicEvents(){
       handleSectionClick(btn); 
     });
   });
-  
+
   // Section row click and drag
   document.querySelectorAll('.section').forEach(row=>{
     row.addEventListener('click', (e)=>{
@@ -235,12 +244,16 @@ function bindDynamicEvents(){
     row.setAttribute('draggable','true');
     row.addEventListener('dragstart', handleSectionDragStart);
     row.addEventListener('dragend', handleDragEnd);
+    // Touch events for mobile drag
+    row.addEventListener('touchstart', handleTouchDragStartSection, {passive:false});
   });
-  
+
   // Drag events for cards
   document.querySelectorAll('.card').forEach(card=>{
     card.addEventListener('dragstart', handleCardDragStart);
     card.addEventListener('dragend', handleDragEnd);
+    // Touch events for mobile drag
+    card.addEventListener('touchstart', handleTouchDragStartCard, {passive:false});
   });
 }
 
@@ -338,6 +351,7 @@ function renderBin(){
   });
 }
 
+
 function createChip(code){
   const chip = document.createElement('div');
   chip.className = 'course-chip';
@@ -346,12 +360,221 @@ function createChip(code){
   chip.textContent = getShortCode(code);
   chip.addEventListener('dragstart', handleChipDragStart);
   chip.addEventListener('dragend', handleDragEnd);
+  // Touch events for mobile drag
+  chip.addEventListener('touchstart', handleTouchDragStartChip, {passive:false});
   // Allow clicking chip to unselect (but prevent default drag behavior on click)
   chip.addEventListener('click', (e)=>{
     e.stopPropagation();
     toggleCourseSelection(code);
   });
   return chip;
+}
+// --- Touch Drag and Drop for Mobile ---
+function handleTouchDragStartCard(e){
+  e.preventDefault();
+  const card = e.currentTarget;
+  const code = card.dataset.code;
+  touchDragEl = card;
+  touchDragType = 'card';
+  touchDragCode = code;
+  touchStartY = e.touches[0].clientY;
+  touchStartX = e.touches[0].clientX;
+  createTouchGhost(card, e.touches[0]);
+  document.addEventListener('touchmove', handleTouchDragMove, {passive:false});
+  document.addEventListener('touchend', handleTouchDragEnd, {passive:false});
+}
+
+function handleTouchDragStartChip(e){
+  e.preventDefault();
+  const chip = e.currentTarget;
+  const code = chip.dataset.code;
+  touchDragEl = chip;
+  touchDragType = 'chip';
+  touchDragCode = code;
+  touchStartY = e.touches[0].clientY;
+  touchStartX = e.touches[0].clientX;
+  createTouchGhost(chip, e.touches[0]);
+  document.addEventListener('touchmove', handleTouchDragMove, {passive:false});
+  document.addEventListener('touchend', handleTouchDragEnd, {passive:false});
+}
+
+function handleTouchDragStartSection(e){
+  e.preventDefault();
+  const row = e.currentTarget;
+  const code = row.getAttribute('data-course');
+  touchDragEl = row;
+  touchDragType = 'card';
+  touchDragCode = code;
+  touchStartY = e.touches[0].clientY;
+  touchStartX = e.touches[0].clientX;
+  createTouchGhost(row, e.touches[0]);
+  document.addEventListener('touchmove', handleTouchDragMove, {passive:false});
+  document.addEventListener('touchend', handleTouchDragEnd, {passive:false});
+}
+
+function createTouchGhost(el, touch){
+  touchGhost = el.cloneNode(true);
+  touchGhost.style.position = 'fixed';
+  touchGhost.style.pointerEvents = 'none';
+  touchGhost.style.opacity = '0.8';
+  touchGhost.style.zIndex = '9999';
+  touchGhost.style.left = (touch.clientX - 40) + 'px';
+  touchGhost.style.top = (touch.clientY - 20) + 'px';
+  touchGhost.style.width = el.offsetWidth + 'px';
+  touchGhost.classList.add('touch-ghost');
+  document.body.appendChild(touchGhost);
+}
+
+function handleTouchDragMove(e){
+  e.preventDefault();
+  if(!touchGhost) return;
+  const touch = e.touches[0];
+  touchGhost.style.left = (touch.clientX - 40) + 'px';
+  touchGhost.style.top = (touch.clientY - 20) + 'px';
+}
+
+function handleTouchDragEnd(e){
+  if(touchGhost){
+    document.body.removeChild(touchGhost);
+    touchGhost = null;
+  }
+  // Find drop target under finger
+  const touch = e.changedTouches[0];
+  const dropTarget = document.elementFromPoint(touch.clientX, touch.clientY);
+  // Preference slots
+  if(dropTarget){
+    if(dropTarget.classList.contains('course-chip')){
+      // Dropped on a chip: treat as swap in preferences
+      const parentSlot = dropTarget.parentElement;
+      const slotRank = getSlotRank(parentSlot);
+      if(slotRank) handleDropOnSlotTouch(slotRank);
+    } else if(dropTarget.id === 'pref1' || dropTarget.id === 'pref2' || dropTarget.id === 'pref3'){
+      const slotRank = getSlotRank(dropTarget);
+      if(slotRank) handleDropOnSlotTouch(slotRank);
+    } else if(dropTarget.id === 'selectedCourses'){
+      handleDropSelectedTouch();
+    } else if(dropTarget.classList.contains('preferences-area')){
+      handleDropPreferencesTouch();
+    } else if(dropTarget.id === 'courseList'){
+      handleDropCourseListTouch();
+    }
+  }
+  touchDragEl = null;
+  touchDragType = null;
+  touchDragCode = null;
+  document.removeEventListener('touchmove', handleTouchDragMove);
+  document.removeEventListener('touchend', handleTouchDragEnd);
+}
+
+function getSlotRank(el){
+  if(!el) return null;
+  if(el.id === 'pref1') return 1;
+  if(el.id === 'pref2') return 2;
+  if(el.id === 'pref3') return 3;
+  return null;
+}
+
+function handleDropOnSlotTouch(targetRank){
+  let draggedCode = touchDragCode;
+  if(!draggedCode) return;
+  // Ensure course is selected
+  if(!state.selected.has(draggedCode)){
+    state.selected.add(draggedCode);
+    const course = courses.find(c=>c.code===draggedCode);
+    if(!state.sectionPrefs[draggedCode]){
+      state.sectionPrefs[draggedCode] = Object.fromEntries(course.sections.map(s=>[s.id,'prefer']));
+    }
+  }
+  // Find where the dragged item currently is
+  let sourceRank = null;
+  for(let r in state.preferences){
+    if(state.preferences[r] === draggedCode) {
+      sourceRank = parseInt(r);
+      break;
+    }
+  }
+  // Get what's currently in the target slot
+  const targetCode = state.preferences[targetRank];
+  if(sourceRank && targetCode){
+    // Swap: both items are in preference slots
+    state.preferences[sourceRank] = targetCode;
+    state.preferences[targetRank] = draggedCode;
+  } else {
+    // Just place in target slot (may displace existing item)
+    if(sourceRank){
+      // Moving from one preference slot to another
+      state.preferences[sourceRank] = null;
+    }
+    if(targetCode){
+      // Target slot occupied, push it out to selected area
+      state.preferences[targetRank] = draggedCode;
+    } else {
+      // Target slot empty, just place it there
+      state.preferences[targetRank] = draggedCode;
+    }
+    // Compact after the move
+    compactPreferences();
+  }
+  renderCourses();
+  renderBin();
+}
+
+function handleDropSelectedTouch(){
+  let code = touchDragCode;
+  if(!code) return;
+  if(touchDragType === 'card'){
+    if(!state.selected.has(code)){
+      state.selected.add(code);
+      const course = courses.find(c=>c.code===code);
+      if(!state.sectionPrefs[code]){
+        state.sectionPrefs[code] = Object.fromEntries(course.sections.map(s=>[s.id,'prefer']));
+      }
+    }
+  } else if(touchDragType === 'chip'){
+    for(let rank in state.preferences){
+      if(state.preferences[rank] === code) state.preferences[rank] = null;
+    }
+    compactPreferences();
+  }
+  renderCourses();
+  renderBin();
+}
+
+function handleDropPreferencesTouch(){
+  let code = touchDragCode;
+  if(!code) return;
+  if(!state.selected.has(code)){
+    state.selected.add(code);
+    const course = courses.find(c=>c.code===code);
+    if(!state.sectionPrefs[code]){
+      state.sectionPrefs[code] = Object.fromEntries(course.sections.map(s=>[s.id,'prefer']));
+    }
+  }
+  for(let r in state.preferences){
+    if(state.preferences[r] === code) state.preferences[r] = null;
+  }
+  let targetRank = null;
+  if(!state.preferences[1]) targetRank = 1;
+  else if(!state.preferences[2]) targetRank = 2;
+  else if(!state.preferences[3]) targetRank = 3;
+  else targetRank = 3;
+  if(targetRank) state.preferences[targetRank] = code;
+  renderCourses();
+  renderBin();
+}
+
+function handleDropCourseListTouch(){
+  let code = touchDragCode;
+  if(!code) return;
+  if(touchDragType === 'chip'){
+    state.selected.delete(code);
+    for(let rank in state.preferences){
+      if(state.preferences[rank] === code) state.preferences[rank] = null;
+    }
+    compactPreferences();
+    renderCourses();
+    renderBin();
+  }
 }
 
 function wireBinDropZones(){
